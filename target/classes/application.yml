@@ -1,0 +1,26 @@
+spring:
+  profiles:
+    default: local
+  config:
+    import: optional:file:.env[.properties]
+  jpa:
+    hibernate.ddl-auto: update
+    open-in-view: false
+
+server:
+  port: ${PORT:8080}
+
+kickbase:
+  # API-Daten bitte als Umgebungsvariablen setzen; keine Zugangsdaten einchecken.
+  community-api-url: ${KICKBASE_COMMUNITY_API_URL:https://api.kickbase.com}
+  league-id: ${KICKBASE_LEAGUE_ID:}
+  access-token: ${KICKBASE_ACCESS_TOKEN:}
+  import-cron: "0 0 10 * * TUE" # Dienstag, 10:00 Uhr
+  player-aliases:
+    Luki: "Lukas Hauenstein"
+    "[Müller]": "Uemller"
+    Passi: "Pascal"
+    Frank: "Fränky"
+    Jo: "JohannesArnold"
+    "[Jörg]": "JB"
+    Robin: "RR7"

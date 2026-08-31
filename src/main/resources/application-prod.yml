@@ -1,0 +1,11 @@
+spring:
+  datasource:
+    # Auf Render als JDBC_DATABASE_URL setzen, z. B. jdbc:postgresql://host:5432/db?sslmode=require
+    url: ${JDBC_DATABASE_URL}
+    username: ${JDBC_DATABASE_USERNAME:}
+    password: ${JDBC_DATABASE_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate.ddl-auto: update
+    properties:
+      hibernate.jdbc.lob.non_contextual_creation: true
