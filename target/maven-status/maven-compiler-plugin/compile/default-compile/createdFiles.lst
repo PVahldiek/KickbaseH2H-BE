@@ -1,11 +1,15 @@
 de\kickbase\h2h\H2hController$FixtureDto.class
 de\kickbase\h2h\ScheduleSeeder.class
 de\kickbase\h2h\H2hController.class
+de\kickbase\h2h\H2hController$FormResult.class
 de\kickbase\h2h\H2hController$TableRowDto.class
+de\kickbase\h2h\H2hController$PredictionDto.class
 de\kickbase\h2h\MatchResultRepository.class
 de\kickbase\h2h\KickbaseImporter$KickbaseManager.class
+de\kickbase\h2h\H2hController$H2hDto.class
 de\kickbase\h2h\KickbaseProperties.class
 de\kickbase\h2h\H2hApplication.class
 de\kickbase\h2h\KickbaseImporter$KickbaseRanking.class
+de\kickbase\h2h\H2hController$PlayerStatsDto.class
 de\kickbase\h2h\KickbaseImporter.class
 de\kickbase\h2h\MatchResult.class
