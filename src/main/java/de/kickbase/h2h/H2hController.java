@@ -3,6 +3,8 @@ package de.kickbase.h2h;
 import java.util.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.ResponseEntity;
 
 @RestController
 @RequestMapping("/api")
@@ -26,23 +28,47 @@ class H2hController {
     importer.importCurrentMatchday();
   }
 
+  @PostMapping("/admin/import-kickbase-all")
+  public ResponseEntity<String> importAllKickbase() {
+
+    importer.importAllMatchdays();
+
+    return ResponseEntity.ok(
+            "Kickbase import for all matchdays started/finished."
+    );
+  }
+
   @GetMapping("/matchdays/{matchday}")
   List<FixtureDto> fixtures(@PathVariable int matchday) {
+
+    int nextMatchday = findNextMatchday();
+
     return repository.findByMatchdayOrderById(matchday)
             .stream()
-            .map(FixtureDto::from)
+            .map(m -> FixtureDto.from(m, matchday == nextMatchday))
             .toList();
   }
 
   @GetMapping("/table")
   List<TableRowDto> table() {
-    return buildTable(repository.findAllByOrderByMatchdayAscIdAsc());
+
+    List<MatchResult> completedMatches =
+            repository.findAllByOrderByMatchdayAscIdAsc()
+                    .stream()
+                    .filter(m ->
+                            m.homePoints != null
+                                    && m.awayPoints != null
+                    )
+                    .toList();
+
+    return buildTable(completedMatches);
   }
 
   /**
    * Returns all statistics required by the H2H information overlay.
    *
-   * Only completed matchdays BEFORE the selected matchday are considered.
+   * H2H information is only available for the next/current
+   * matchday that has not been completed yet.
    */
   @GetMapping("/h2h/{matchday}")
   H2hDto h2h(
@@ -50,6 +76,36 @@ class H2hController {
           @RequestParam String homePlayer,
           @RequestParam String awayPlayer
   ) {
+
+    int nextMatchday = findNextMatchday();
+
+    /*
+     * Important:
+     * The frontend also prevents access to older/future matchdays,
+     * but the backend enforces the rule as well.
+     */
+    if (matchday != nextMatchday) {
+      throw new ResponseStatusException(
+              HttpStatus.FORBIDDEN,
+              "H2H-Statistiken sind nur für den kommenden Spieltag verfügbar."
+      );
+    }
+
+    /*
+     * Make sure the requested fixture actually belongs to the
+     * selected matchday.
+     */
+    boolean fixtureExists = repository
+            .findByMatchdayAndHomePlayer(matchday, homePlayer)
+            .filter(m -> m.awayPlayer.equals(awayPlayer))
+            .isPresent();
+
+    if (!fixtureExists) {
+      throw new ResponseStatusException(
+              HttpStatus.NOT_FOUND,
+              "Das angeforderte Duell wurde nicht gefunden."
+      );
+    }
 
     List<MatchResult> allMatches =
             repository.findAllByOrderByMatchdayAscIdAsc();
@@ -103,6 +159,34 @@ class H2hController {
       m.awayPoints = points.get(m.awayPlayer);
       repository.save(m);
     }
+  }
+
+  /**
+   * Finds the next/current matchday.
+   *
+   * The next matchday is the first matchday for which at least one
+   * fixture does not have both points values set.
+   *
+   * Example:
+   *
+   * Matchday 1 -> completed
+   * Matchday 2 -> completed
+   * Matchday 3 -> incomplete
+   * Matchday 4 -> no results yet
+   *
+   * => Matchday 3 is the next/current matchday.
+   */
+  private int findNextMatchday() {
+
+    return repository.findAllByOrderByMatchdayAscIdAsc()
+            .stream()
+            .filter(m ->
+                    m.homePoints == null
+                            || m.awayPoints == null
+            )
+            .mapToInt(m -> m.matchday)
+            .min()
+            .orElse(0);
   }
 
   /**
@@ -251,7 +335,11 @@ class H2hController {
                     m.homePlayer.equals(player)
                             || m.awayPlayer.equals(player)
             )
-            .sorted(Comparator.comparingInt((MatchResult m) -> m.matchday).reversed())
+            .sorted(
+                    Comparator.comparingInt(
+                            (MatchResult m) -> m.matchday
+                    ).reversed()
+            )
             .limit(5)
             .toList();
 
@@ -395,15 +483,20 @@ class H2hController {
           String homePlayer,
           String awayPlayer,
           Integer homePoints,
-          Integer awayPoints
+          Integer awayPoints,
+          boolean h2hAvailable
   ) {
-    static FixtureDto from(MatchResult m) {
+    static FixtureDto from(
+            MatchResult m,
+            boolean h2hAvailable
+    ) {
       return new FixtureDto(
               m.matchday,
               m.homePlayer,
               m.awayPlayer,
               m.homePoints,
-              m.awayPoints
+              m.awayPoints,
+              h2hAvailable
       );
     }
   }
