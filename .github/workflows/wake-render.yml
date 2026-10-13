@@ -1,0 +1,32 @@
+name: Wake Render before Kickbase import
+
+on:
+  schedule:
+    # 07:55 UTC is 09:55 CEST; 08:55 UTC is 09:55 CET.
+    # The guard below ensures only the correct one performs the request.
+    - cron: "55 7,8 * * 2"
+  workflow_dispatch:
+
+jobs:
+  wake-render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Berlin time
+        id: berlin-time
+        shell: bash
+        run: |
+          local_time="$(TZ=Europe/Berlin date +%H:%M)"
+          echo "Berlin time: ${local_time}"
+          if [ "${local_time}" = "09:55" ]; then
+            echo "should_wake=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_wake=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wake Render through health endpoint
+        if: steps.berlin-time.outputs.should_wake == 'true' || github.event_name == 'workflow_dispatch'
+        env:
+          RENDER_HEALTH_URL: ${{ secrets.RENDER_HEALTH_URL }}
+        run: |
+          test -n "$RENDER_HEALTH_URL"
+          curl --fail --show-error --silent --retry 3 --retry-all-errors --max-time 60 "$RENDER_HEALTH_URL"

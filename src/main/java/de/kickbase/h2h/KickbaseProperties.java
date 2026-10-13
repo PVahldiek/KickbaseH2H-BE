@@ -9,6 +9,8 @@ class KickbaseProperties {
   private String communityApiUrl = "";
   private String leagueId = "";
   private String accessToken = "";
+  private String email = "";
+  private String password = "";
   private Map<String, String> playerAliases = new HashMap<>();
   public String getCommunityApiUrl() { return communityApiUrl; }
   public void setCommunityApiUrl(String value) { communityApiUrl = value; }
@@ -16,6 +18,10 @@ class KickbaseProperties {
   public void setLeagueId(String value) { leagueId = value; }
   public String getAccessToken() { return accessToken; }
   public void setAccessToken(String value) { accessToken = value; }
+  public String getEmail() { return email; }
+  public void setEmail(String value) { email = value; }
+  public String getPassword() { return password; }
+  public void setPassword(String value) { password = value; }
   public Map<String, String> getPlayerAliases() { return playerAliases; }
   public void setPlayerAliases(Map<String, String> value) { playerAliases = value; }
 }

@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 @Service
@@ -62,6 +63,13 @@ class KickbaseImporter {
 
     log.info("Starting Kickbase import for all matchdays...");
 
+    RestClient client = RestClient.builder().baseUrl(properties.getCommunityApiUrl()).build();
+    String token = obtainToken(client);
+    if (token.isBlank()) {
+      log.warn("Kickbase import skipped: no valid login credentials or access token configured.");
+      return;
+    }
+
     /*
      * Bundesliga normally has 34 matchdays.
      *
@@ -77,7 +85,7 @@ class KickbaseImporter {
                 matchday
         );
 
-        importMatchday(matchday);
+        importMatchday(client, token, matchday);
 
       } catch (Exception e) {
 
@@ -109,9 +117,21 @@ class KickbaseImporter {
                     .baseUrl(properties.getCommunityApiUrl())
                     .build();
 
+    String token = obtainToken(client);
+    if (token.isBlank()) {
+      log.warn("Kickbase import skipped: no valid login credentials or access token configured.");
+      return;
+    }
+
+    importMatchday(client, token, matchday);
+  }
+
+  private void importMatchday(RestClient client, String token, Integer matchday) {
+
     KickbaseRanking response;
 
-    if (matchday == null) {
+    try {
+      if (matchday == null) {
 
       /*
        * Existing behavior:
@@ -130,12 +150,12 @@ class KickbaseImporter {
                       )
                       .header(
                               "Authorization",
-                              "Bearer " + properties.getAccessToken()
+                              "Bearer " + token
                       )
                       .retrieve()
                       .body(KickbaseRanking.class);
 
-    } else {
+      } else {
 
       /*
        * Import a specific matchday:
@@ -167,10 +187,14 @@ class KickbaseImporter {
                       )
                       .header(
                               "Authorization",
-                              "Bearer " + properties.getAccessToken()
+                              "Bearer " + token
                       )
                       .retrieve()
                       .body(KickbaseRanking.class);
+      }
+    } catch (HttpClientErrorException error) {
+      log.error("Kickbase ranking request for matchday {} was rejected with HTTP {}. Check KICKBASE_LEAGUE_ID and account access to that league.", matchday == null ? "current" : matchday, error.getStatusCode());
+      return;
     }
 
     if (
@@ -281,7 +305,36 @@ class KickbaseImporter {
 
     return !properties.getCommunityApiUrl().isBlank()
             && !properties.getLeagueId().isBlank()
-            && !properties.getAccessToken().isBlank();
+            && ((!properties.getEmail().isBlank() && !properties.getPassword().isBlank())
+                    || !properties.getAccessToken().isBlank());
+  }
+
+  /** Obtains a fresh token for every import when email/password secrets are configured. */
+  private String obtainToken(RestClient client) {
+
+    if (properties.getEmail().isBlank() || properties.getPassword().isBlank()) {
+      return properties.getAccessToken();
+    }
+
+    try {
+      KickbaseLoginResponse response = client.post()
+              .uri("/v4/user/login")
+              .header("Accept", "application/json")
+              .header("Content-Type", "application/json")
+              .body(new KickbaseLoginRequest(
+                      properties.getEmail(),
+                      false,
+                      properties.getPassword(),
+                      Map.of()
+              ))
+              .retrieve()
+              .body(KickbaseLoginResponse.class);
+
+      return response == null || response.token() == null ? "" : response.token();
+    } catch (HttpClientErrorException error) {
+      log.error("Kickbase login was rejected with HTTP {}. Check KICKBASE_EMAIL and KICKBASE_PASSWORD; no credentials were logged.", error.getStatusCode());
+      return "";
+    }
   }
 
   private String resolveApiName(String h2hName) {
@@ -343,5 +396,11 @@ class KickbaseImporter {
     Integer matchdayPoints() {
       return mdp;
     }
+  }
+
+  record KickbaseLoginRequest(String em, boolean loy, String pass, Map<String, Object> rep) {}
+
+  record KickbaseLoginResponse(String tkn) {
+    String token() { return tkn; }
   }
 }
